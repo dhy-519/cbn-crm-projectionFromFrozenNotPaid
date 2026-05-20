@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Proyeksi CRM - Time Series</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fc; color: #333; margin: 0; padding: 25px; }
+        .container { max-width: 1100px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        h1 { color: #4e73df; font-size: 24px; margin-top: 0; margin-bottom: 5px; text-align: center; }
+        p.subtitle { text-align: center; color: #858796; margin-bottom: 25px; font-size: 14px; }
+        
+        /* Log Area */
+        #log-container { background-color: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 13px; margin-bottom: 20px; height: 100px; overflow-y: auto; }
+        .log-error { color: #ff5252; font-weight: bold; }
+        .log-warn { color: #feca57; }
+        .log-success { color: #4af626; }
+        .log-info { color: #00d2d3; }
+
+        /* Dashboard Filter */
+        #dashboard-content { display: none; }
+        .filter-section { display: flex; align-items: center; justify-content: space-between; background: #f8f9fc; padding: 15px 20px; border-radius: 8px; border: 1px solid #e3e6f0; margin-bottom: 20px; }
+        .filter-section label { font-weight: 600; color: #4e73df; font-size: 15px; }
+        .filter-section select { padding: 8px 15px; border-radius: 5px; border: 1px solid #d1d3e2; font-size: 15px; font-weight: bold; color: #333; outline: none; cursor: pointer; min-width: 250px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        
+        /* Table Styles */
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+        th, td { border: 1px solid #e3e6f0; padding: 14px 10px; text-align: right; }
+        
+        /* Kolom Header */
+        th { background-color: #4e73df; color: white; text-align: center; white-space: nowrap; font-weight: 600; }
+        th.pred-col { background-color: #1cc88a; } /* Warna pembeda untuk kolom prediksi */
+        
+        /* Baris Indikator Kiri */
+        td:first-child { text-align: left; font-weight: bold; color: #4e73df; background-color: #f8f9fc; width: 22%; }
+        
+        /* Styling tambahan tabel */
+        tr:hover td { background-color: #eaecf4; }
+        tr:hover td:first-child { background-color: #eaecf4; }
+        td.pred-val { font-weight: bold; color: #1cc88a; background-color: #f1fdf8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Dashboard Proyeksi CRM</h1>
+    <p class="subtitle">Time Series Analysis: Jan-Apr (Aktual) | Mei-Jun (Prediksi)</p>
+    
+    <div id="log-container">
+        <div id="logs">Mulai proses inisiasi...</div>
+    </div>
+    
+    <div id="dashboard-content">
+        <div class="filter-section">
+            <label for="regionFilter">Pilih Region:</label>
+            <select id="regionFilter" onchange="renderTable()">
+                <option value="Grand Total">🌟 Grand Total (Semua Region)</option>
+                </select>
+        </div>
+
+        <div class="table-responsive">
+            <table id="resultTable">
+                <thead>
+                    <tr>
+                        <th>Indikator</th>
+                        <th>Jan-26</th>
+                        <th>Feb-26</th>
+                        <th>Mar-26</th>
+                        <th>Apr-26</th>
+                        <th class="pred-col">May-26 (Prediksi)</th>
+                        <th class="pred-col">Jun-26 (Prediksi)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Object global untuk menyimpan data kalkulasi
+    let dashboardData = {};
+
+    // Fungsi Log layar
+    function writeLog(message, type = 'info') {
+        const logDiv = document.getElementById('logs');
+        let colorClass = '';
+        if(type === 'error') colorClass = 'log-error';
+        if(type === 'success') colorClass = 'log-success';
+        if(type === 'warn') colorClass = 'log-warn';
+        if(type === 'info') colorClass = 'log-info';
+        
+        logDiv.innerHTML += `<br><span class="${colorClass}">[${new Date().toLocaleTimeString()}] ${message}</span>`;
+        document.getElementById('log-container').scrollTop = document.getElementById('log-container').scrollHeight;
+    }
+
+    const baseUrl = "https://raw.githubusercontent.com/dhy-519/cbn-crm-projectionFromFrozenNotPaid/main/";
+    
+    // MENAMBAHKAN Churn Sub ke daftar tarikan file agar historikal Jan-Apr akurat
+    const urls = {
+        rate: { link: baseUrl + "Churn%20Rate.csv", name: "Churn Rate" },
+        sub:  { link: baseUrl + "Churn%20Sub.csv", name: "Churn Sub" },
+        eop:  { link: baseUrl + "EOP.csv", name: "EOP" },
+        f5:   { link: baseUrl + "Frozen%20Not%20Paid%20in%205D.csv", name: "Frozen 5D" },
+        f10:  { link: baseUrl + "Frozen%20Not%20Paid%20in%2010D.csv", name: "Frozen 10D" }
+    };
+
+    function cleanNum(str) {
+        if(!str) return 0;
+        let s = String(str).replace(/,/g, '').replace(/%/g, '').trim();
+        let n = parseFloat(s);
+        return isNaN(n) ? 0 : n;
+    }
+
+    // Banker's Rounding
+    function pythonRound(n) {
+        let rounded = Math.round(n);
+        if (Math.abs(n % 1) === 0.5) {
+            let floor = Math.floor(n);
+            return (floor % 2 === 0) ? floor : floor + 1;
+        }
+        return rounded;
+    }
+
+    // Regresi Linier
+    function linearRegression(x, y) {
+        let n = x.length;
+        let sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
+        for(let i = 0; i < n; i++) {
+            sum_x += x[i]; sum_y += y[i]; sum_xy += x[i] * y[i]; sum_xx += x[i] * x[i];
+        }
+        let denominator = (n * sum_xx - sum_x * sum_x);
+        if (denominator === 0) return { predict: val => sum_y / n }; 
+        let m = (n * sum_xy - sum_x * sum_y) / denominator;
+        let c = (sum_y - m * sum_x) / n;
+        return { predict: val => m * val + c };
+    }
+
+    async function fetchFile(fileObj) {
+        writeLog(`Mengunduh file: ${fileObj.name}...`, 'info');
+        let response = await fetch(fileObj.link, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP Error ${response.status}: File tidak ditemukan.`);
+        let textData = await response.text();
+        
+        let lines = textData.split(/\r?\n/);
+        while(lines.length > 0 && !lines[0].toLowerCase().startsWith('region')) { lines.shift(); }
+        let cleanText = lines.join('\n');
+        
+        return new Promise((resolve, reject) => {
+            Papa.parse(cleanText, {
+                header: true, skipEmptyLines: true, transformHeader: function(h) { return h.trim(); },
+                complete: function(results) { resolve(results.data); },
+                error: function(err) { reject(err); }
+            });
+        });
+    }
+
+    async function loadData() {
+        try {
+            const rateData = await fetchFile(urls.rate);
+            const subData = await fetchFile(urls.sub); // Historis Churn Sub
+            const eopData = await fetchFile(urls.eop);
+            const f5Data = await fetchFile(urls.f5);
+            const f10Data = await fetchFile(urls.f10);
+
+            writeLog("Membangun matriks data Region...", "warn");
+
+            let regions = Object.keys(eopData[0]).filter(k => 
+                k.toLowerCase() !== 'region' && k.toLowerCase() !== 'grand total' && k !== ''
+            );
+
+            // Inisialisasi Penampung Grand Total (Array 6 Bulan)
+            dashboardData['Grand Total'] = { 
+                eop: [0,0,0,0,0,0], sub: [0,0,0,0,0,0], rate: [0,0,0,0,0,0], f5: [0,0,0,0,0,0], f10: [0,0,0,0,0,0] 
+            };
+
+            let selectBox = document.getElementById('regionFilter');
+
+            for(let region of regions) {
+                // Populate Dropdown
+                let opt = document.createElement('option');
+                opt.value = region; opt.innerHTML = `➡ ${region}`;
+                selectBox.appendChild(opt);
+
+                // Tarik historis Jan-Apr
+                let hist_rate = [], hist_sub = [], hist_eop = [], f5 = [], f10 = [], time_x = [1, 2, 3, 4];
+
+                for(let i=0; i<4; i++) {
+                    hist_rate.push(cleanNum(rateData[i][region]) / 100);
+                    hist_sub.push(cleanNum(subData[i][region]));
+                    hist_eop.push(cleanNum(eopData[i][region]));
+                    f5.push(cleanNum(f5Data[i][region])); 
+                    f10.push(cleanNum(f10Data[i][region])); 
+                }
+
+                // Ambil nilai predictor Mei dan Juni
+                let may_5d_val  = cleanNum(f5Data[4][region]);
+                let jun_10d_val = cleanNum(f10Data[5][region]);
+                
+                // Masukkan data 5D dan 10D full 6 bulan
+                f5.push(may_5d_val, cleanNum(f5Data[5][region]));
+                f10.push(cleanNum(f10Data[4][region]), jun_10d_val);
+
+                // Regresi Prediksi
+                let lr_rate_may = linearRegression(f5.slice(0,4), hist_rate);
+                let lr_rate_jun = linearRegression(f10.slice(0,4), hist_rate); 
+                let lr_eop      = linearRegression(time_x, hist_eop);
+
+                let pred_rate_may = lr_rate_may.predict(may_5d_val);
+                let pred_rate_jun = lr_rate_jun.predict(jun_10d_val);
+                
+                let pred_eop_may  = pythonRound(lr_eop.predict(5));
+                let pred_eop_jun  = pythonRound(lr_eop.predict(6));
+                
+                let pred_sub_may = pythonRound(pred_eop_may * pred_rate_may);
+                let pred_sub_jun = pythonRound(pred_eop_jun * pred_rate_jun);
+
+                // Gabungkan Array (Jan-Jun)
+                let arr_eop = [...hist_eop, pred_eop_may, pred_eop_jun];
+                let arr_sub = [...hist_sub, pred_sub_may, pred_sub_jun];
+                let arr_rate = [...hist_rate, pred_rate_may, pred_rate_jun];
+
+                // Simpan ke memory
+                dashboardData[region] = { eop: arr_eop, sub: arr_sub, rate: arr_rate, f5: f5, f10: f10 };
+
+                // Akumulasi langsung ke Grand Total secara bottom-up (Sangat Akurat)
+                for(let i=0; i<6; i++) {
+                    dashboardData['Grand Total'].eop[i] += arr_eop[i];
+                    dashboardData['Grand Total'].sub[i] += arr_sub[i];
+                    dashboardData['Grand Total'].f5[i]  += f5[i];
+                    dashboardData['Grand Total'].f10[i] += f10[i];
+                }
+            }
+
+            // Hitung Ulang Rate untuk Grand Total (Sub / EOP)
+            for(let i=0; i<6; i++) {
+                dashboardData['Grand Total'].rate[i] = dashboardData['Grand Total'].eop[i] 
+                    ? (dashboardData['Grand Total'].sub[i] / dashboardData['Grand Total'].eop[i]) : 0;
+            }
+
+            writeLog("PROSES SELESAI. Menampilkan dashboard interaktif.", "success");
+            
+            setTimeout(() => {
+                document.getElementById('log-container').style.display = 'none';
+                document.getElementById('dashboard-content').style.display = 'block';
+                renderTable(); // Panggil data pertama (Grand Total)
+            }, 800);
+
+        } catch (error) {
+            writeLog(`PROSES DIHENTIKAN: ${error.message || error}`, "error");
+        }
+    }
+
+    // Fungsi Render Tabel Saat Filter Berubah
+    function renderTable() {
+        let region = document.getElementById('regionFilter').value;
+        let data = dashboardData[region];
+        
+        let tbody = document.getElementById('tableBody');
+        
+        // Helper fungsi penulisan baris
+        const buildRow = (label, arr, isPercent) => {
+            return `<tr>
+                <td>${label}</td>
+                <td>${isPercent ? (arr[0]*100).toFixed(2)+'%' : arr[0].toLocaleString('id-ID')}</td>
+                <td>${isPercent ? (arr[1]*100).toFixed(2)+'%' : arr[1].toLocaleString('id-ID')}</td>
+                <td>${isPercent ? (arr[2]*100).toFixed(2)+'%' : arr[2].toLocaleString('id-ID')}</td>
+                <td>${isPercent ? (arr[3]*100).toFixed(2)+'%' : arr[3].toLocaleString('id-ID')}</td>
+                <td class="pred-val">${isPercent ? (arr[4]*100).toFixed(2)+'%' : arr[4].toLocaleString('id-ID')}</td>
+                <td class="pred-val">${isPercent ? (arr[5]*100).toFixed(2)+'%' : arr[5].toLocaleString('id-ID')}</td>
+            </tr>`;
+        };
+
+        // Injeksi Baris ke HTML
+        tbody.innerHTML = 
+            buildRow("EOP (Total Pelanggan)", data.eop, false) +
+            buildRow("Churn Sub (Pelanggan Keluar)", data.sub, false) +
+            buildRow("Churn Rate (%)", data.rate, true) +
+            buildRow("Frozen Not Paid in 5D", data.f5, false) +
+            buildRow("Frozen Not Paid in 10D", data.f10, false);
+    }
+
+    // Mulai Eksekusi
+    window.onload = loadData;
+</script>
+
+</body>
+</html>
