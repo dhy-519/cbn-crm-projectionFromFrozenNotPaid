@@ -3,103 +3,498 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Proyeksi CRM - Time Series</title>
+    <title>Dashboard Proyeksi CRM - Professional View</title>
+    
+    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fc; color: #333; margin: 0; padding: 25px; }
-        .container { max-width: 1100px; margin: auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        h1 { color: #4e73df; font-size: 24px; margin-top: 0; margin-bottom: 5px; text-align: center; }
-        p.subtitle { text-align: center; color: #858796; margin-bottom: 25px; font-size: 14px; }
-        
-        /* Log Area */
-        #log-container { background-color: #1e1e1e; color: #4af626; padding: 15px; border-radius: 5px; font-family: monospace; font-size: 13px; margin-bottom: 20px; height: 100px; overflow-y: auto; }
-        .log-error { color: #ff5252; font-weight: bold; }
-        .log-warn { color: #feca57; }
-        .log-success { color: #4af626; }
-        .log-info { color: #00d2d3; }
+        /* ================= LIGHT MODE (DEFAULT) ================= */
+        :root {
+            --primary: #2563eb;       /* Biru Utama */
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;       /* Amber/Kuning Prediksi */
+            --warning-bg: #fffbeb;
+            --warning-text: #b45309;
+            --danger: #ef4444;
+            
+            /* Backgrounds & Surfaces */
+            --bg-body: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-input: #ffffff;
+            
+            /* Typography */
+            --text-main: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            
+            /* Borders & Shadows */
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-card: 0 2px 4px rgba(0,0,0,0.03), 0 8px 16px rgba(0,0,0,0.03);
+        }
 
-        /* Dashboard Filter */
-        #dashboard-content { display: none; }
-        .filter-section { display: flex; align-items: center; justify-content: space-between; background: #f8f9fc; padding: 15px 20px; border-radius: 8px; border: 1px solid #e3e6f0; margin-bottom: 20px; }
-        .filter-section label { font-weight: 600; color: #4e73df; font-size: 15px; }
-        .filter-section select { padding: 8px 15px; border-radius: 5px; border: 1px solid #d1d3e2; font-size: 15px; font-weight: bold; color: #333; outline: none; cursor: pointer; min-width: 250px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        /* ================= DARK MODE ================= */
+        body.dark-theme {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #94a3b8;
+            --success: #34d399;
+            --warning: #fbbf24;       /* Lebih terang di dark mode */
+            --warning-bg: rgba(251, 191, 36, 0.15);
+            --warning-text: #fcd34d;
+            --danger: #f87171;
+            
+            /* Backgrounds & Surfaces */
+            --bg-body: #0f172a;       /* Slate 900 */
+            --bg-card: #1e293b;       /* Slate 800 */
+            --bg-input: #334155;
+            
+            /* Typography */
+            --text-main: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            
+            /* Borders & Shadows */
+            --border: #334155;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            --shadow-card: 0 2px 4px rgba(0,0,0,0.5), 0 8px 16px rgba(0,0,0,0.4);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* --- Header Section --- */
+        header {
+            background: var(--bg-card);
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title span { color: var(--primary); }
+        .header-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+        /* --- Theme Switcher (FIXED) --- */
+        .theme-switcher {
+            display: flex;
+            align-items: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            position: relative;
+            cursor: pointer;
+            padding: 4px;
+            width: 140px;
+            height: 36px;
+            transition: border-color 0.3s, background-color 0.3s;
+            margin-left: 20px;
+        }
+        .theme-switcher .slider {
+            position: absolute; top: 3px; left: 3px;
+            width: calc(50% - 3px); height: calc(100% - 6px);
+            background: var(--primary);
+            border-radius: 20px;
+            transition: transform 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+            z-index: 1;
+        }
+        .theme-switcher .switch-btn {
+            flex: 1; display: flex; align-items: center; justify-content: center;
+            gap: 6px; font-size: 11.5px; font-weight: 600; z-index: 2;
+            color: var(--text-secondary); transition: color 0.35s; user-select: none;
+        }
+
+        /* LOGIC PERBAIKAN: */
+        /* 1. Default (Light Mode): Slider di KANAN (100%), Teks Light Putih */
+        .theme-switcher .slider { transform: translateX(100%); }
+        .theme-switcher .switch-btn.light { color: #ffffff; }
+
+        /* 2. Dark Mode: Slider di KIRI (0%), Teks Dark Putih, Teks Light Abu-abu */
+        body.dark-theme .theme-switcher .slider { transform: translateX(0); }
+        body.dark-theme .theme-switcher .switch-btn.dark { color: #ffffff; }
+        body.dark-theme .theme-switcher .switch-btn.light { color: var(--text-secondary); }
+
+        /* --- Main Layout --- */
+        main {
+            padding: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        /* --- Filter Bar --- */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            background: var(--bg-card);
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .filter-group { display: flex; align-items: center; gap: 10px; }
+        .filter-label { font-size: 14px; font-weight: 600; color: var(--text-muted); }
         
-        /* Table Styles */
+        select {
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-main);
+            outline: none;
+            background-color: var(--bg-input);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 280px;
+        }
+        select:hover, select:focus { border-color: var(--primary); background-color: var(--bg-card); }
+
+        /* --- KPI Cards --- */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--warning);
+            transition: transform 0.2s, background-color 0.3s, border-color 0.3s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); }
+
+        .kpi-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .kpi-badge {
+            font-size: 10px;
+            background: var(--warning-bg);
+            color: var(--warning-text);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+        .kpi-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        /* --- Chart Section --- */
+        .chart-container {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-card);
+            margin-bottom: 25px;
+            height: 400px;
+            position: relative;
+            border: 1px solid var(--border);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        /* --- Data Table --- */
+        .table-container {
+            background: var(--bg-card);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        .table-header-title { font-size: 16px; font-weight: 700; margin-bottom: 15px; color: var(--text-main); }
+        
         .table-responsive { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
-        th, td { border: 1px solid #e3e6f0; padding: 14px 10px; text-align: right; }
-        
-        /* Kolom Header */
-        th { background-color: #4e73df; color: white; text-align: center; white-space: nowrap; font-weight: 600; }
-        th.pred-col { background-color: #1cc88a; } /* Warna pembeda untuk kolom prediksi */
-        
-        /* Baris Indikator Kiri */
-        td:first-child { text-align: left; font-weight: bold; color: #4e73df; background-color: #f8f9fc; width: 22%; }
-        
-        /* Styling tambahan tabel */
-        tr:hover td { background-color: #eaecf4; }
-        tr:hover td:first-child { background-color: #eaecf4; }
-        td.pred-val { font-weight: bold; color: #1cc88a; background-color: #f1fdf8; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+
+        th {
+            background-color: var(--bg-input);
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-align: right;
+            padding: 16px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        th:first-child { text-align: left; position: sticky; left: 0; background-color: var(--bg-input); z-index: 10; }
+
+        td {
+            padding: 14px 16px;
+            text-align: right;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-main);
+            position: sticky;
+            left: 0;
+            background-color: var(--bg-card);
+            z-index: 5;
+            transition: background-color 0.3s;
+        }
+
+        tr:hover td { background-color: var(--bg-input); }
+        tr:hover td:first-child { background-color: var(--bg-input); }
+        tr:last-child td { border-bottom: none; }
+
+        /* Prediction Style */
+        .pred-col {
+            color: var(--warning-text);
+            background-color: var(--warning-bg);
+            font-weight: 600;
+        }
+        .pred-col-header {
+            background-color: var(--warning-bg) !important;
+            color: var(--warning-text) !important;
+        }
+
+        /* --- Loading Overlay --- */
+        #loader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid var(--warning);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        .loading-text { font-size: 16px; color: var(--text-muted); font-weight: 500; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- Toast Notification --- */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; }
+        .toast {
+            background: #333; color: white;
+            padding: 12px 24px; border-radius: 8px; margin-top: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex; align-items: center; gap: 10px; font-size: 14px;
+            animation: slideIn 0.3s ease-out;
+        }
+        .toast.error { background: var(--danger); }
+        .toast.success { background: var(--success); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        @media (max-width: 768px) {
+            .controls-bar { flex-direction: column; align-items: stretch; gap: 15px; }
+            select { min-width: 100%; }
+            .kpi-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 480px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            header { flex-direction: column; align-items: flex-start; gap: 15px; }
+            .theme-switcher { margin-left: 0; width: 100%; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Dashboard Proyeksi CRM</h1>
-    <p class="subtitle">Time Series Analysis: Jan-Apr (Aktual) | Mei-Jun (Prediksi)</p>
-    
-    <div id="log-container">
-        <div id="logs">Mulai proses inisiasi...</div>
+    <!-- Loading Overlay -->
+    <div id="loader">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loadingText">Menginisialisasi Dashboard...</div>
     </div>
-    
-    <div id="dashboard-content">
-        <div class="filter-section">
-            <label for="regionFilter">Pilih Region:</label>
-            <select id="regionFilter" onchange="renderTable()">
-                <option value="Grand Total">🌟 Grand Total (Semua Region)</option>
+
+    <!-- Notifications -->
+    <div id="toast-container"></div>
+
+    <header>
+        <div class="header-title">
+            <h1><span>●</span> Dashboard Proyeksi CRM</h1>
+            <div class="header-subtitle">Time Series Analysis: Jan-Apr (Aktual) | Mei-Jun (Prediksi)</div>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <div style="font-size: 12px; color: var(--text-muted); text-align: right; margin-right: 15px;">
+                Last Updated: <span id="lastUpdated">-</span>
+            </div>
+            
+            <!-- THEME SWITCHER BUTTON (FIXED LOGIC) -->
+            <div class="theme-switcher" onclick="toggleTheme()" title="Ubah Tema">
+                <div class="slider"></div>
+                <div class="switch-btn dark"><i class="fa-solid fa-moon"></i> Dark</div>
+                <div class="switch-btn light"><i class="fa-solid fa-sun"></i> Light</div>
+            </div>
+        </div>
+    </header>
+
+    <main id="main-content">
+        <!-- Controls -->
+        <div class="controls-bar">
+            <div class="filter-group">
+                <label class="filter-label">Region View:</label>
+                <select id="regionFilter" onchange="updateDashboard()">
+                    <option value="Grand Total">🌟 Grand Total (Nasional)</option>
                 </select>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted);">
+                <span style="display:inline-block; width:10px; height:10px; background:var(--primary); border-radius:50%; margin-right:5px;"></span>Aktual
+                <span style="display:inline-block; width:10px; height:10px; background:var(--warning); border-radius:50%; margin-left:10px; margin-right:5px;"></span>Prediksi
+            </div>
         </div>
 
-        <div class="table-responsive">
-            <table id="resultTable">
-                <thead>
-                    <tr>
-                        <th>Indikator</th>
-                        <th>Jan-26</th>
-                        <th>Feb-26</th>
-                        <th>Mar-26</th>
-                        <th>Apr-26</th>
-                        <th class="pred-col">May-26 (Prediksi)</th>
-                        <th class="pred-col">Jun-26 (Prediksi)</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    </tbody>
-            </table>
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">
+                    EOP Projected (May-26)
+                    <span class="kpi-badge">FORECAST</span>
+                </div>
+                <div class="kpi-value" id="kpi-eop-may">-</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">
+                    EOP Projected (Jun-26)
+                    <span class="kpi-badge">FORECAST</span>
+                </div>
+                <div class="kpi-value" id="kpi-eop-jun">-</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">
+                    Churn Rate (May-26)
+                    <span class="kpi-badge">FORECAST</span>
+                </div>
+                <div class="kpi-value" id="kpi-rate-may">-</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">
+                    Churn Rate (Jun-26)
+                    <span class="kpi-badge">FORECAST</span>
+                </div>
+                <div class="kpi-value" id="kpi-rate-jun">-</div>
+            </div>
         </div>
-    </div>
-</div>
+
+        <!-- Chart Area -->
+        <div class="chart-container">
+            <canvas id="trendChart"></canvas>
+        </div>
+
+        <!-- Detailed Table -->
+        <div class="table-container">
+            <div class="table-header-title">Detail Data Periode</div>
+            <div class="table-responsive">
+                <table id="resultTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">Metrik / Indikator</th>
+                            <th>Jan-26</th>
+                            <th>Feb-26</th>
+                            <th>Mar-26</th>
+                            <th>Apr-26</th>
+                            <th class="pred-col-header">May-26 (Pred)</th>
+                            <th class="pred-col-header">Jun-26 (Pred)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Rows injected via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
 
 <script>
-    // Object global untuk menyimpan data kalkulasi
+    // --- Global State ---
     let dashboardData = {};
+    let chartInstance = null;
 
-    // Fungsi Log layar
-    function writeLog(message, type = 'info') {
-        const logDiv = document.getElementById('logs');
-        let colorClass = '';
-        if(type === 'error') colorClass = 'log-error';
-        if(type === 'success') colorClass = 'log-success';
-        if(type === 'warn') colorClass = 'log-warn';
-        if(type === 'info') colorClass = 'log-info';
+    // --- Theme Logic ---
+    function toggleTheme() {
+        document.body.classList.toggle('dark-theme');
+        const isDark = document.body.classList.contains('dark-theme');
+        localStorage.setItem('dashboard_theme', isDark ? 'dark' : 'light');
         
-        logDiv.innerHTML += `<br><span class="${colorClass}">[${new Date().toLocaleTimeString()}] ${message}</span>`;
-        document.getElementById('log-container').scrollTop = document.getElementById('log-container').scrollHeight;
+        // Re-render chart to update grid/text colors
+        if(chartInstance) {
+            updateDashboard();
+        }
     }
 
+    // Initialize Theme
+    if (localStorage.getItem('dashboard_theme') === 'dark') {
+        document.body.classList.add('dark-theme');
+    }
+
+    // --- Utils: Log & UI Feedback ---
+    function setLoadingText(msg) {
+        document.getElementById('loadingText').innerText = msg;
+    }
+
+    function showToast(msg, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = type === 'error' ? `⚠ ${msg}` : (type === 'success' ? `✓ ${msg}` : `ℹ ${msg}`);
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    }
+
+    // --- Data Logic (Preserved) ---
     const baseUrl = "https://raw.githubusercontent.com/dhy-519/cbn-crm-projectionFromFrozenNotPaid/main/";
-    
-    // MENAMBAHKAN Churn Sub ke daftar tarikan file agar historikal Jan-Apr akurat
     const urls = {
         rate: { link: baseUrl + "Churn%20Rate.csv", name: "Churn Rate" },
         sub:  { link: baseUrl + "Churn%20Sub.csv", name: "Churn Sub" },
@@ -115,7 +510,6 @@
         return isNaN(n) ? 0 : n;
     }
 
-    // Banker's Rounding
     function pythonRound(n) {
         let rounded = Math.round(n);
         if (Math.abs(n % 1) === 0.5) {
@@ -125,7 +519,6 @@
         return rounded;
     }
 
-    // Regresi Linier
     function linearRegression(x, y) {
         let n = x.length;
         let sum_x = 0, sum_y = 0, sum_xy = 0, sum_xx = 0;
@@ -140,9 +533,9 @@
     }
 
     async function fetchFile(fileObj) {
-        writeLog(`Mengunduh file: ${fileObj.name}...`, 'info');
+        setLoadingText(`Memuat data: ${fileObj.name}...`);
         let response = await fetch(fileObj.link, { cache: "no-store" });
-        if (!response.ok) throw new Error(`HTTP Error ${response.status}: File tidak ditemukan.`);
+        if (!response.ok) throw new Error(`Gagal memuat ${fileObj.name}`);
         let textData = await response.text();
         
         let lines = textData.split(/\r?\n/);
@@ -160,19 +553,19 @@
 
     async function loadData() {
         try {
+            setLoadingText("Menghubungkan ke sumber data...");
             const rateData = await fetchFile(urls.rate);
-            const subData = await fetchFile(urls.sub); // Historis Churn Sub
+            const subData = await fetchFile(urls.sub);
             const eopData = await fetchFile(urls.eop);
             const f5Data = await fetchFile(urls.f5);
             const f10Data = await fetchFile(urls.f10);
 
-            writeLog("Membangun matriks data Region...", "warn");
+            setLoadingText("Menganalisis time series dan regresi...");
 
             let regions = Object.keys(eopData[0]).filter(k => 
                 k.toLowerCase() !== 'region' && k.toLowerCase() !== 'grand total' && k !== ''
             );
 
-            // Inisialisasi Penampung Grand Total (Array 6 Bulan)
             dashboardData['Grand Total'] = { 
                 eop: [0,0,0,0,0,0], sub: [0,0,0,0,0,0], rate: [0,0,0,0,0,0], f5: [0,0,0,0,0,0], f10: [0,0,0,0,0,0] 
             };
@@ -180,12 +573,10 @@
             let selectBox = document.getElementById('regionFilter');
 
             for(let region of regions) {
-                // Populate Dropdown
                 let opt = document.createElement('option');
                 opt.value = region; opt.innerHTML = `➡ ${region}`;
                 selectBox.appendChild(opt);
 
-                // Tarik historis Jan-Apr
                 let hist_rate = [], hist_sub = [], hist_eop = [], f5 = [], f10 = [], time_x = [1, 2, 3, 4];
 
                 for(let i=0; i<4; i++) {
@@ -196,37 +587,29 @@
                     f10.push(cleanNum(f10Data[i][region])); 
                 }
 
-                // Ambil nilai predictor Mei dan Juni
                 let may_5d_val  = cleanNum(f5Data[4][region]);
                 let jun_10d_val = cleanNum(f10Data[5][region]);
                 
-                // Masukkan data 5D dan 10D full 6 bulan
                 f5.push(may_5d_val, cleanNum(f5Data[5][region]));
                 f10.push(cleanNum(f10Data[4][region]), jun_10d_val);
 
-                // Regresi Prediksi
                 let lr_rate_may = linearRegression(f5.slice(0,4), hist_rate);
                 let lr_rate_jun = linearRegression(f10.slice(0,4), hist_rate); 
                 let lr_eop      = linearRegression(time_x, hist_eop);
 
                 let pred_rate_may = lr_rate_may.predict(may_5d_val);
                 let pred_rate_jun = lr_rate_jun.predict(jun_10d_val);
-                
                 let pred_eop_may  = pythonRound(lr_eop.predict(5));
                 let pred_eop_jun  = pythonRound(lr_eop.predict(6));
-                
                 let pred_sub_may = pythonRound(pred_eop_may * pred_rate_may);
                 let pred_sub_jun = pythonRound(pred_eop_jun * pred_rate_jun);
 
-                // Gabungkan Array (Jan-Jun)
                 let arr_eop = [...hist_eop, pred_eop_may, pred_eop_jun];
                 let arr_sub = [...hist_sub, pred_sub_may, pred_sub_jun];
                 let arr_rate = [...hist_rate, pred_rate_may, pred_rate_jun];
 
-                // Simpan ke memory
                 dashboardData[region] = { eop: arr_eop, sub: arr_sub, rate: arr_rate, f5: f5, f10: f10 };
 
-                // Akumulasi langsung ke Grand Total secara bottom-up (Sangat Akurat)
                 for(let i=0; i<6; i++) {
                     dashboardData['Grand Total'].eop[i] += arr_eop[i];
                     dashboardData['Grand Total'].sub[i] += arr_sub[i];
@@ -235,55 +618,209 @@
                 }
             }
 
-            // Hitung Ulang Rate untuk Grand Total (Sub / EOP)
             for(let i=0; i<6; i++) {
                 dashboardData['Grand Total'].rate[i] = dashboardData['Grand Total'].eop[i] 
                     ? (dashboardData['Grand Total'].sub[i] / dashboardData['Grand Total'].eop[i]) : 0;
             }
 
-            writeLog("PROSES SELESAI. Menampilkan dashboard interaktif.", "success");
-            
+            document.getElementById('loader').style.opacity = '0';
             setTimeout(() => {
-                document.getElementById('log-container').style.display = 'none';
-                document.getElementById('dashboard-content').style.display = 'block';
-                renderTable(); // Panggil data pertama (Grand Total)
-            }, 800);
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('main-content').style.opacity = '1';
+                document.getElementById('lastUpdated').innerText = new Date().toLocaleString('id-ID');
+                showToast("Data berhasil dimuat", "success");
+                updateDashboard();
+            }, 500);
 
         } catch (error) {
-            writeLog(`PROSES DIHENTIKAN: ${error.message || error}`, "error");
+            console.error(error);
+            showToast(`Error: ${error.message}`, "error");
+            setLoadingText("Terjadi kesalahan koneksi.");
         }
     }
 
-    // Fungsi Render Tabel Saat Filter Berubah
-    function renderTable() {
+    // --- Rendering Functions ---
+
+    function updateDashboard() {
         let region = document.getElementById('regionFilter').value;
         let data = dashboardData[region];
-        
-        let tbody = document.getElementById('tableBody');
-        
-        // Helper fungsi penulisan baris
+        if(!data) return;
+
+        renderKPIs(data);
+        renderTable(data);
+        renderChart(data, region);
+    }
+
+    function renderKPIs(data) {
+        const eopMay = data.eop[4];
+        const eopJun = data.eop[5];
+        const rateMay = data.rate[4] * 100;
+        const rateJun = data.rate[5] * 100;
+
+        document.getElementById('kpi-eop-may').innerText = eopMay.toLocaleString('id-ID');
+        document.getElementById('kpi-eop-jun').innerText = eopJun.toLocaleString('id-ID');
+        document.getElementById('kpi-rate-may').innerText = rateMay.toFixed(2) + '%';
+        document.getElementById('kpi-rate-jun').innerText = rateJun.toFixed(2) + '%';
+    }
+
+    function renderTable(data) {
+        const format = (val, isPct) => isPct 
+            ? (val*100).toFixed(2) + '%' 
+            : val.toLocaleString('id-ID');
+
         const buildRow = (label, arr, isPercent) => {
+            const cells = arr.map((val, idx) => {
+                const isPred = idx >= 4;
+                const cls = isPred ? 'pred-col' : '';
+                return `<td class="${cls}">${format(val, isPercent)}</td>`;
+            }).join('');
+            
             return `<tr>
                 <td>${label}</td>
-                <td>${isPercent ? (arr[0]*100).toFixed(2)+'%' : arr[0].toLocaleString('id-ID')}</td>
-                <td>${isPercent ? (arr[1]*100).toFixed(2)+'%' : arr[1].toLocaleString('id-ID')}</td>
-                <td>${isPercent ? (arr[2]*100).toFixed(2)+'%' : arr[2].toLocaleString('id-ID')}</td>
-                <td>${isPercent ? (arr[3]*100).toFixed(2)+'%' : arr[3].toLocaleString('id-ID')}</td>
-                <td class="pred-val">${isPercent ? (arr[4]*100).toFixed(2)+'%' : arr[4].toLocaleString('id-ID')}</td>
-                <td class="pred-val">${isPercent ? (arr[5]*100).toFixed(2)+'%' : arr[5].toLocaleString('id-ID')}</td>
+                ${cells}
             </tr>`;
         };
 
-        // Injeksi Baris ke HTML
-        tbody.innerHTML = 
+        document.getElementById('tableBody').innerHTML = 
             buildRow("EOP (Total Pelanggan)", data.eop, false) +
-            buildRow("Churn Sub (Pelanggan Keluar)", data.sub, false) +
+            buildRow("Churn Sub (Keluar)", data.sub, false) +
             buildRow("Churn Rate (%)", data.rate, true) +
-            buildRow("Frozen Not Paid in 5D", data.f5, false) +
-            buildRow("Frozen Not Paid in 10D", data.f10, false);
+            buildRow("Frozen Not Paid 5D", data.f5, false) +
+            buildRow("Frozen Not Paid 10D", data.f10, false);
     }
 
-    // Mulai Eksekusi
+    function renderChart(data, label) {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        // Theme Detection
+        const isDark = document.body.classList.contains('dark-theme');
+        
+        // Adaptive Colors based on Theme
+        const gridColor = isDark ? '#334155' : '#e2e8f0'; // Dark vs Light grid
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const titleColor = isDark ? '#f8fafc' : '#1e293b';
+        const tooltipBg = isDark ? '#1e293b' : '#ffffff';
+        const tooltipBody = isDark ? '#cbd5e1' : '#475569';
+        
+        // Prediction Color in Chart (Yellow)
+        const predColor = '#fbbf24'; 
+
+        let gradientEOP = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientEOP.addColorStop(0, isDark ? 'rgba(59, 130, 246, 0.5)' : 'rgba(37, 99, 235, 0.5)');
+        gradientEOP.addColorStop(1, isDark ? 'rgba(59, 130, 246, 0.0)' : 'rgba(37, 99, 235, 0.0)');
+
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May (Pred)', 'Jun (Pred)'];
+        
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'EOP (Pelanggan)',
+                        data: data.eop,
+                        borderColor: isDark ? '#3b82f6' : '#2563eb',
+                        backgroundColor: gradientEOP,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Churn Rate (%)',
+                        data: data.rate.map(r => r * 100),
+                        borderColor: '#ef4444',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.3,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `Tren Proyeksi: ${label}`,
+                        font: { size: 16, weight: 'bold' },
+                        padding: { bottom: 20 },
+                        color: titleColor
+                    },
+                    legend: {
+                        labels: { color: textColor }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBg,
+                        titleColor: titleColor,
+                        bodyColor: tooltipBody,
+                        borderColor: isDark ? '#334155' : '#cbd5e1',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                if (context.parsed.y !== null) {
+                                    if(context.datasetIndex === 1) { 
+                                        label += context.parsed.y.toFixed(2) + '%';
+                                    } else {
+                                        label += context.parsed.y.toLocaleString('id-ID');
+                                    }
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor, drawTicks: false },
+                        ticks: { color: textColor },
+                        border: { display: false }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Jumlah Pelanggan', color: textColor },
+                        grid: { color: gridColor, borderDash: [2, 4] },
+                        ticks: { color: textColor },
+                        border: { display: false }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Churn Rate (%)', color: textColor },
+                        grid: { display: false },
+                        ticks: { color: textColor },
+                        border: { display: false }
+                    }
+                },
+                elements: {
+                    line: {
+                        segment: {
+                            // Change line style after April (index 3)
+                            borderColor: ctx => ctx.p0DataIndex >= 3 ? predColor : undefined,
+                            borderDash: ctx => ctx.p0DataIndex >= 3 ? [6, 6] : undefined,
+                        }
+                    },
+                    point: {
+                        backgroundColor: ctx => ctx.dataIndex >= 4 ? predColor : (isDark ? '#3b82f6' : '#2563eb')
+                    }
+                }
+            }
+        });
+    }
+
     window.onload = loadData;
 </script>
 
